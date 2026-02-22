@@ -1,2 +1,2 @@
-# tensor_analytics
+# Tensor Analytics
 Design Patterns for Tensor Analytics
