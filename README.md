@@ -45,4 +45,4 @@ What it does:
 
 ### Helper scripts
 - `gpu_setup_check.sh`: Automates env setup and runs the GPU checks.
-- `gpu_check.py`: Prints TensorFlow GPU devices and PyTorch MPS status, runs a small TensorFlow matmul on `/GPU:0` when present, a small PyTorch matmul on `mps` when available, and compares matmul timings CPU vs GPU for both frameworks (calling out which side is faster).
+- `gpu_check.py`: Prints TensorFlow GPU devices and PyTorch MPS status, runs a small TensorFlow matmul on `/GPU:0` when present, a small PyTorch matmul on `mps` when available, and compares a heavier matmul+ReLU+matmul workload on CPU vs GPU for both frameworks (calling out which side is faster).

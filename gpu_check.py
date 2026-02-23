@@ -67,8 +67,8 @@ def run_tensorflow_matmul() -> None:
         print(f"TensorFlow matmul error: {exc}")
 
 
-def compare_torch_perf(size: int = 512, reps: int = 5) -> None:
-    """Compare matmul time on CPU vs MPS (if available)."""
+def compare_torch_perf(size: int = 1024, reps: int = 3) -> None:
+    """Compare a heavier matmul+relu+matmul workload on CPU vs MPS (if available)."""
     if not torch.backends.mps.is_available():
         print("torch perf: skipped (MPS not available).")
         return
@@ -76,13 +76,20 @@ def compare_torch_perf(size: int = 512, reps: int = 5) -> None:
     def _matmul(dev: torch.device) -> float:
         a = torch.randn(size, size, device=dev)
         b = torch.randn(size, size, device=dev)
+        bias = torch.randn(size, size, device=dev)
+
+        def _work():
+            c = torch.relu(a @ b + bias)
+            d = c @ b
+            return d
+
         # Warmup
-        _ = a @ b
+        _ = _work()
         if dev.type == "mps":
             torch.mps.synchronize()
         start = time.perf_counter()
         for _ in range(reps):
-            c = a @ b
+            c = _work()
         if dev.type == "mps":
             torch.mps.synchronize()
         end = time.perf_counter()
@@ -95,13 +102,13 @@ def compare_torch_perf(size: int = 512, reps: int = 5) -> None:
     faster = "mps" if mps_time < cpu_time else "cpu"
     ratio = cpu_time / mps_time if mps_time else float("inf")
     print(
-        f"torch perf (size={size}, reps={reps}): cpu {cpu_time:.6f}s vs mps {mps_time:.6f}s "
+        f"torch perf (matmul+relu+matmul, size={size}, reps={reps}): cpu {cpu_time:.6f}s vs mps {mps_time:.6f}s "
         f"(faster: {faster}, speedup: {ratio:.2f}x vs mps)"
     )
 
 
-def compare_tensorflow_perf(size: int = 512, reps: int = 5) -> None:
-    """Compare matmul time on CPU vs GPU/Metal if available."""
+def compare_tensorflow_perf(size: int = 1024, reps: int = 3) -> None:
+    """Compare a heavier matmul+relu+matmul workload on CPU vs GPU/Metal if available."""
     gpus = tf.config.list_physical_devices("GPU")
     if not gpus:
         print("TensorFlow perf: skipped (no GPU/Metal detected).")
@@ -111,11 +118,18 @@ def compare_tensorflow_perf(size: int = 512, reps: int = 5) -> None:
         with tf.device(device):
             a = tf.random.normal([size, size])
             b = tf.random.normal([size, size])
+            bias = tf.random.normal([size, size])
+
+            def _work():
+                c = tf.nn.relu(tf.matmul(a, b) + bias)
+                d = tf.matmul(c, b)
+                return d
+
             # Warmup
-            _ = tf.matmul(a, b)
+            _ = _work()
             start = time.perf_counter()
             for _ in range(reps):
-                c = tf.matmul(a, b)
+                c = _work()
             # Force sync
             _ = c.numpy().sum()
             end = time.perf_counter()
@@ -126,7 +140,7 @@ def compare_tensorflow_perf(size: int = 512, reps: int = 5) -> None:
     faster = "gpu" if gpu_time < cpu_time else "cpu"
     ratio = cpu_time / gpu_time if gpu_time else float("inf")
     print(
-        f"TensorFlow perf (size={size}, reps={reps}): cpu {cpu_time:.6f}s vs gpu {gpu_time:.6f}s "
+        f"TensorFlow perf (matmul+relu+matmul, size={size}, reps={reps}): cpu {cpu_time:.6f}s vs gpu {gpu_time:.6f}s "
         f"(faster: {faster}, speedup: {ratio:.2f}x vs gpu)"
     )
 
