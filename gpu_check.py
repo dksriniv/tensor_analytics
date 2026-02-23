@@ -1,6 +1,7 @@
 """Quick GPU check for Apple Silicon using PyTorch (MPS) and TensorFlow (Metal)."""
 
 import sys
+import time
 
 import tensorflow as tf
 import torch
@@ -66,11 +67,67 @@ def run_tensorflow_matmul() -> None:
         print(f"TensorFlow matmul error: {exc}")
 
 
+def compare_torch_perf(size: int = 512, reps: int = 5) -> None:
+    """Compare matmul time on CPU vs MPS (if available)."""
+    if not torch.backends.mps.is_available():
+        print("torch perf: skipped (MPS not available).")
+        return
+
+    def _matmul(dev: torch.device) -> float:
+        a = torch.randn(size, size, device=dev)
+        b = torch.randn(size, size, device=dev)
+        # Warmup
+        _ = a @ b
+        if dev.type == "mps":
+            torch.mps.synchronize()
+        start = time.perf_counter()
+        for _ in range(reps):
+            c = a @ b
+        if dev.type == "mps":
+            torch.mps.synchronize()
+        end = time.perf_counter()
+        # prevent optimizations
+        _ = c.sum().item()
+        return (end - start) / reps
+
+    cpu_time = _matmul(torch.device("cpu"))
+    mps_time = _matmul(torch.device("mps"))
+    print(f"torch perf (size={size}, reps={reps}): cpu {cpu_time:.6f}s vs mps {mps_time:.6f}s per matmul")
+
+
+def compare_tensorflow_perf(size: int = 512, reps: int = 5) -> None:
+    """Compare matmul time on CPU vs GPU/Metal if available."""
+    gpus = tf.config.list_physical_devices("GPU")
+    if not gpus:
+        print("TensorFlow perf: skipped (no GPU/Metal detected).")
+        return
+
+    def _matmul(device: str) -> float:
+        with tf.device(device):
+            a = tf.random.normal([size, size])
+            b = tf.random.normal([size, size])
+            # Warmup
+            _ = tf.matmul(a, b)
+            start = time.perf_counter()
+            for _ in range(reps):
+                c = tf.matmul(a, b)
+            # Force sync
+            _ = c.numpy().sum()
+            end = time.perf_counter()
+            return (end - start) / reps
+
+    cpu_time = _matmul("/CPU:0")
+    gpu_time = _matmul("/GPU:0")
+    print(f"TensorFlow perf (size={size}, reps={reps}): cpu {cpu_time:.6f}s vs gpu {gpu_time:.6f}s per matmul")
+
+
 def main() -> int:
     check_tensorflow()
     check_torch_mps()
     run_tensorflow_matmul()
     run_torch_matmul()
+    compare_tensorflow_perf()
+    compare_torch_perf()
     return 0
 
 
