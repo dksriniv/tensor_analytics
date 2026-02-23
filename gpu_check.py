@@ -37,9 +37,40 @@ def check_torch_mps() -> None:
         print("torch: MPS not available; using CPU.")
 
 
+def run_torch_matmul() -> None:
+    """Run a small matmul on MPS if available."""
+    if not torch.backends.mps.is_available():
+        print("torch matmul: skipped (MPS not available).")
+        return
+    try:
+        a = torch.randn(256, 256, device="mps")
+        b = torch.randn(256, 256, device="mps")
+        c = a @ b
+        print(f"torch matmul device: {c.device} sum: {c.sum().item():.4f}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"torch matmul error: {exc}")
+
+
+def run_tensorflow_matmul() -> None:
+    """Run a small matmul on GPU/Metal if available."""
+    try:
+        if not tf.config.list_physical_devices("GPU"):
+            print("TensorFlow matmul: skipped (no GPU/Metal detected).")
+            return
+        with tf.device("/GPU:0"):
+            a = tf.random.normal([256, 256])
+            b = tf.random.normal([256, 256])
+            c = tf.matmul(a, b)
+            print("TensorFlow matmul device: /GPU:0 sum:", float(tf.reduce_sum(c)))
+    except Exception as exc:  # noqa: BLE001
+        print(f"TensorFlow matmul error: {exc}")
+
+
 def main() -> int:
     check_tensorflow()
     check_torch_mps()
+    run_tensorflow_matmul()
+    run_torch_matmul()
     return 0
 
 
