@@ -92,7 +92,12 @@ def compare_torch_perf(size: int = 512, reps: int = 5) -> None:
 
     cpu_time = _matmul(torch.device("cpu"))
     mps_time = _matmul(torch.device("mps"))
-    print(f"torch perf (size={size}, reps={reps}): cpu {cpu_time:.6f}s vs mps {mps_time:.6f}s per matmul")
+    faster = "mps" if mps_time < cpu_time else "cpu"
+    ratio = cpu_time / mps_time if mps_time else float("inf")
+    print(
+        f"torch perf (size={size}, reps={reps}): cpu {cpu_time:.6f}s vs mps {mps_time:.6f}s "
+        f"(faster: {faster}, speedup: {ratio:.2f}x vs mps)"
+    )
 
 
 def compare_tensorflow_perf(size: int = 512, reps: int = 5) -> None:
@@ -118,7 +123,12 @@ def compare_tensorflow_perf(size: int = 512, reps: int = 5) -> None:
 
     cpu_time = _matmul("/CPU:0")
     gpu_time = _matmul("/GPU:0")
-    print(f"TensorFlow perf (size={size}, reps={reps}): cpu {cpu_time:.6f}s vs gpu {gpu_time:.6f}s per matmul")
+    faster = "gpu" if gpu_time < cpu_time else "cpu"
+    ratio = cpu_time / gpu_time if gpu_time else float("inf")
+    print(
+        f"TensorFlow perf (size={size}, reps={reps}): cpu {cpu_time:.6f}s vs gpu {gpu_time:.6f}s "
+        f"(faster: {faster}, speedup: {ratio:.2f}x vs gpu)"
+    )
 
 
 def main() -> int:
